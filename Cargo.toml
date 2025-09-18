@@ -1,0 +1,12 @@
+[package]
+name = "blackhole"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+glfw = "0.56.0"
+gl = "0.14.0"
+nalgebra-glm = "0.18.0"
+
+[build-dependencies]
+gl_generator = "0.14.0"
