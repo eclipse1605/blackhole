@@ -153,31 +153,18 @@ impl Camera {
     }
 
     fn passive_mouse_move(&mut self, x: f64, y: f64, width: f64, height: f64) {
-        let nx = (x / width as f64) * 2.0 - 1.0;
-        let ny = (y / height as f64) * 2.0 - 1.0;
+        let dx = (x - self.last_x) as f32;
+        let dy = (y - self.last_y) as f32;
 
-        // Edge case: if mouse hits window edge, wrap around
-        if x <= 0.0 {
-            self.last_x = width - 2.0;
-        } else if x >= width - 1.0 {
-            self.last_x = 1.0;
-        }
-        if y <= 0.0 {
-            self.last_y = height - 2.0;
-        } else if y >= height - 1.0 {
-            self.last_y = 1.0;
-        }
+        let sensitivity = 0.001;
 
-        let sensitivity = 0.01;
-
-        self.azimuth += (nx as f32) * sensitivity;
-        self.elevation -= (ny as f32) * sensitivity;
-
+        self.azimuth += dx * sensitivity;
+        self.elevation -= dy * sensitivity;
         self.elevation = self.elevation.clamp(0.01, std::f32::consts::PI - 0.01);
 
         self.last_x = x;
         self.last_y = y;
-}
+    }
 
 }
 
