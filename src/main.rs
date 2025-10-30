@@ -151,6 +151,34 @@ impl Camera {
         self.roll += delta;
         println!("Camera roll: {:.1}°", self.roll.to_degrees());
     }
+
+    fn passive_mouse_move(&mut self, x: f64, y: f64, width: f64, height: f64) {
+        let nx = (x / width as f64) * 2.0 - 1.0;
+        let ny = (y / height as f64) * 2.0 - 1.0;
+
+        // Edge case: if mouse hits window edge, wrap around
+        if x <= 0.0 {
+            self.last_x = width - 2.0;
+        } else if x >= width - 1.0 {
+            self.last_x = 1.0;
+        }
+        if y <= 0.0 {
+            self.last_y = height - 2.0;
+        } else if y >= height - 1.0 {
+            self.last_y = 1.0;
+        }
+
+        let sensitivity = 0.01;
+
+        self.azimuth += (nx as f32) * sensitivity;
+        self.elevation -= (ny as f32) * sensitivity;
+
+        self.elevation = self.elevation.clamp(0.01, std::f32::consts::PI - 0.01);
+
+        self.last_x = x;
+        self.last_y = y;
+}
+
 }
 
 fn load_shader(path: &str, shader_type: u32) -> Result<u32, String> {
@@ -349,6 +377,7 @@ fn main() {
     };
 
     let mut camera = Camera::new();
+    let mut passive_tracking = false;
     
     let mut render_disk = true;
     let mut gravitational_lensing = true;
@@ -374,6 +403,7 @@ fn main() {
     println!("║   4 Key             : Top view                     ║");
     println!("║   Q/E Keys          : Roll camera left/right       ║");
     println!("║   R Key             : Reset camera roll            ║");
+    println!("║   T Key             : Active/passive mouse tracking║");
     println!("╠════════════════════════════════════════════════════╣");
     println!("║ RENDERING                                          ║");
     println!("║   D Key             : Toggle accretion disk        ║");
@@ -393,6 +423,10 @@ fn main() {
         
         for (_, event) in glfw::flush_messages(&events) {
             match event {
+                glfw::WindowEvent::Key(Key::T, _, Action::Press, _) => {
+                    passive_tracking = !passive_tracking;
+                    println!("Passive mouse tracking: {}", if passive_tracking { "ON" } else { "OFF" });
+                },
                 glfw::WindowEvent::FramebufferSize(width, height) => {
                     unsafe {
                         Viewport(0, 0, width, height);
@@ -458,12 +492,23 @@ fn main() {
                     camera.dragging = false;
                 }
                 glfw::WindowEvent::CursorPos(x, y) => {
-                    camera.process_mouse_move(x, y);
-                }
+                    if passive_tracking {
+                        camera.passive_mouse_move(x, y, WIDTH as f64, HEIGHT as f64);
+                    } else {
+                        camera.process_mouse_move(x, y);
+                    }
+                },
                 glfw::WindowEvent::Scroll(_, yoffset) => {
                     camera.process_scroll(yoffset);
                 }
                 _ => {}
+            }
+        }
+
+        if passive_tracking {
+            let (x, y) = window.get_cursor_pos();
+            if x <= 0.0 || x >= WIDTH as f64 - 1.0 || y <= 0.0 || y >= HEIGHT as f64 - 1.0 {
+                window.set_cursor_pos((WIDTH / 2) as f64, (HEIGHT / 2) as f64);
             }
         }
 
