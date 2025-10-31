@@ -7,11 +7,14 @@ use gl_bindings::*;
 
 const WIDTH: u32 = 1920;
 const HEIGHT: u32 = 1080;
+const TITLE: &str = "Black Hole Renderer";
 
 mod camera;
 mod shader;
+mod renderer;
 use shader::{create_shader_program};
 use camera::{Camera, CameraMode};
+use renderer::window::WindowContext;
 
 fn create_fullscreen_quad() -> u32 {
     let vertices: [f32; 18] = [
@@ -50,24 +53,14 @@ fn create_fullscreen_quad() -> u32 {
 }
 
 fn main() {
-    let mut glfw = glfw::init(glfw::fail_on_errors).unwrap();
-    glfw.window_hint(glfw::WindowHint::ContextVersion(3, 3));
-    glfw.window_hint(glfw::WindowHint::OpenGlProfile(glfw::OpenGlProfileHint::Core));
-    glfw.window_hint(glfw::WindowHint::OpenGlForwardCompat(true));
+    
+    let mut window_ctx = WindowContext::new(WIDTH, HEIGHT, TITLE);
 
-    let (mut window, events) = glfw
-        .create_window(WIDTH, HEIGHT, "Black Hole 3D Renderer", glfw::WindowMode::Windowed)
-        .expect("Failed to create GLFW window");
-
-    window.set_key_polling(true);
-    window.set_mouse_button_polling(true);
-    window.set_cursor_pos_polling(true);
-    window.set_scroll_polling(true);
-    window.set_framebuffer_size_polling(true);
-    window.make_current();
-    glfw.set_swap_interval(glfw::SwapInterval::Sync(1));
-
-    load_with(|symbol| window.get_proc_address(symbol) as *const _);
+    window_ctx.window.set_key_polling(true);
+    window_ctx.window.set_mouse_button_polling(true);
+    window_ctx.window.set_cursor_pos_polling(true);
+    window_ctx.window.set_scroll_polling(true);
+    window_ctx.window.set_framebuffer_size_polling(true);
 
     unsafe {
         let version = std::ffi::CStr::from_ptr(GetString(VERSION) as *const i8);
@@ -161,7 +154,7 @@ fn main() {
     let start_time = std::time::Instant::now();
 
     unsafe {
-        let (fb_width, fb_height) = window.get_framebuffer_size();
+        let (fb_width, fb_height) = window_ctx.window.get_framebuffer_size();
         Viewport(0, 0, fb_width, fb_height);
         ClearColor(0.0, 0.0, 0.0, 1.0);
     }
@@ -190,13 +183,13 @@ fn main() {
     println!("Current shader: SIMPLE");
     println!("Camera mode: Free Orbit");
 
-    while !window.should_close() {
-        let current_time = glfw.get_time();
+    while !window_ctx.window.should_close() {
+        let current_time = window_ctx.glfw.get_time();
         camera.update(current_time);
         
-        glfw.poll_events();
+        window_ctx.poll();
         
-        for (_, event) in glfw::flush_messages(&events) {
+        for (_, event) in glfw::flush_messages(&window_ctx.events) {
             match event {
                 glfw::WindowEvent::Key(Key::T, _, Action::Press, _) => {
                     passive_tracking = !passive_tracking;
@@ -208,7 +201,7 @@ fn main() {
                     }
                 }
                 glfw::WindowEvent::Key(Key::Escape, _, Action::Press, _) => {
-                    window.set_should_close(true);
+                    window_ctx.window.set_should_close(true);
                 }
                 glfw::WindowEvent::Key(Key::D, _, Action::Press, _) => {
                     render_disk = !render_disk;
@@ -258,7 +251,7 @@ fn main() {
                 }
                 glfw::WindowEvent::MouseButton(glfw::MouseButton::Button1, Action::Press, _) => {
                     camera.dragging = true;
-                    let (x, y) = window.get_cursor_pos();
+                    let (x, y) = window_ctx.window.get_cursor_pos();
                     camera.last_x = x;
                     camera.last_y = y;
                 }
@@ -280,9 +273,9 @@ fn main() {
         }
 
         if passive_tracking {
-            let (x, y) = window.get_cursor_pos();
+            let (x, y) = window_ctx.window.get_cursor_pos();
             if x <= 0.0 || x >= WIDTH as f64 - 1.0 || y <= 0.0 || y >= HEIGHT as f64 - 1.0 {
-                window.set_cursor_pos((WIDTH / 2) as f64, (HEIGHT / 2) as f64);
+                window_ctx.window.set_cursor_pos((WIDTH / 2) as f64, (HEIGHT / 2) as f64);
             }
         }
 
@@ -294,7 +287,7 @@ fn main() {
             UseProgram(shader_program);
         }
 
-        let (fb_width, fb_height) = window.get_framebuffer_size();
+        let (fb_width, fb_height) = window_ctx.window.get_framebuffer_size();
         let elapsed = start_time.elapsed().as_secs_f32();
         let cam_pos = camera.get_position();
         let view_mat = camera.get_view_matrix();
@@ -320,7 +313,7 @@ fn main() {
             BindVertexArray(0);
         }
 
-        window.swap_buffers();
+        window_ctx.window.swap_buffers();
     }
 
     unsafe {
