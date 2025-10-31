@@ -1,229 +1,17 @@
 use glfw::{Action, Context, Key};
-use nalgebra_glm as glm;
 use std::ffi::CString;
 use std::ptr;
 
-include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+mod gl_bindings;
+use gl_bindings::*;
 
 const WIDTH: u32 = 1920;
 const HEIGHT: u32 = 1080;
-const PI: f32 = std::f32::consts::PI;
 
-#[derive(PartialEq, Clone, Copy)]
-enum CameraMode {
-    FreeOrbit,
-    AutoOrbit,
-    FrontView,
-    TopView, 
-}
-
-struct Camera {
-    mode: CameraMode,
-    azimuth: f32,
-    elevation: f32,
-    radius: f32,
-    target_radius: f32,
-    min_radius: f32,
-    max_radius: f32,
-    orbit_speed: f32,
-    zoom_speed: f32,
-    auto_orbit_speed: f32,
-    lerp_factor: f32,
-    dragging: bool,
-    last_x: f64,
-    last_y: f64,
-    roll: f32,
-}
-
-impl Camera {
-    fn new() -> Self {
-        Camera {
-            mode: CameraMode::FreeOrbit,
-            azimuth: PI * 0.25,      
-            elevation: PI * 0.45,
-            radius: 6.0e10,
-            target_radius: 6.0e10,
-            min_radius: 2.0e10,
-            max_radius: 2.0e11,
-            orbit_speed: 0.003,
-            zoom_speed: 5.0e9,
-            auto_orbit_speed: 0.05,
-            lerp_factor: 0.1,
-            dragging: false,
-            last_x: 0.0,
-            last_y: 0.0,
-            roll: 0.0,
-        }
-    }
-
-    fn update(&mut self, time: f64) {
-        self.radius += (self.target_radius - self.radius) * self.lerp_factor;
-        
-        if self.mode == CameraMode::AutoOrbit {
-            self.azimuth = (time as f32) * self.auto_orbit_speed;
-            self.elevation = (PI * 0.3) + ((time * 0.05).sin() as f32) * 0.3;
-        }
-    }
-
-    fn get_position(&self) -> glm::Vec3 {
-        match self.mode {
-            CameraMode::FrontView => {
-                glm::vec3(10.0e10, 1.0e10, 10.0e10)
-            }
-            CameraMode::TopView => {
-                glm::vec3(0.0, 15.0e10, 0.1e10)
-            }
-            _ => {
-                let elev_clamped = self.elevation.clamp(0.01, PI - 0.01);
-                glm::vec3(
-                    self.radius * elev_clamped.sin() * self.azimuth.cos(),
-                    self.radius * elev_clamped.cos(),
-                    self.radius * elev_clamped.sin() * self.azimuth.sin(),
-                )
-            }
-        }
-    }
-
-    fn get_view_matrix(&self) -> glm::Mat3 {
-        let pos = self.get_position();
-        let target = glm::vec3(0.0, 0.0, 0.0);
-        let forward = glm::normalize(&(target - pos));
-        
-        // Handle roll for camera rotation
-        let world_up = glm::vec3(0.0, 1.0, 0.0);
-        let right = glm::normalize(&glm::cross(&forward, &world_up));
-        let up = glm::cross(&right, &forward);
-        
-        // Apply roll if needed
-        if self.roll.abs() > 0.001 {
-            let cos_roll = self.roll.cos();
-            let sin_roll = self.roll.sin();
-            let right_rolled = right * cos_roll + up * sin_roll;
-            let up_rolled = -right * sin_roll + up * cos_roll;
-            
-            glm::mat3(
-                right_rolled.x, right_rolled.y, right_rolled.z,
-                up_rolled.x, up_rolled.y, up_rolled.z,
-                forward.x, forward.y, forward.z
-            )
-        } else {
-            glm::mat3(
-                right.x, right.y, right.z,
-                up.x, up.y, up.z,
-                forward.x, forward.y, forward.z
-            )
-        }
-    }
-
-    fn process_mouse_move(&mut self, x: f64, y: f64) {
-        if self.dragging && (self.mode == CameraMode::FreeOrbit || self.mode == CameraMode::AutoOrbit) {
-            let dx = (x - self.last_x) as f32;
-            let dy = (y - self.last_y) as f32;
-            
-            if self.mode == CameraMode::AutoOrbit {
-                self.mode = CameraMode::FreeOrbit;
-            }
-            
-            self.azimuth += dx * self.orbit_speed;
-            self.elevation -= dy * self.orbit_speed;
-            self.elevation = self.elevation.clamp(0.01, PI - 0.01);
-        }
-        self.last_x = x;
-        self.last_y = y;
-    }
-
-    fn process_scroll(&mut self, yoffset: f64) {
-        self.target_radius -= yoffset as f32 * self.zoom_speed;
-        self.target_radius = self.target_radius.clamp(self.min_radius, self.max_radius);
-    }
-    
-    fn set_mode(&mut self, mode: CameraMode) {
-        self.mode = mode;
-        println!("Camera mode: {:?}", match mode {
-            CameraMode::FreeOrbit => "Free Orbit",
-            CameraMode::AutoOrbit => "Auto Orbit",
-            CameraMode::FrontView => "Front View",
-            CameraMode::TopView => "Top View",
-        });
-    }
-    
-    fn adjust_roll(&mut self, delta: f32) {
-        self.roll += delta;
-        println!("Camera roll: {:.1}°", self.roll.to_degrees());
-    }
-
-    fn passive_mouse_move(&mut self, x: f64, y: f64, width: f64, height: f64) {
-        let dx = (x - self.last_x) as f32;
-        let dy = (y - self.last_y) as f32;
-
-        let sensitivity = 0.001;
-
-        self.azimuth += dx * sensitivity;
-        self.elevation -= dy * sensitivity;
-        self.elevation = self.elevation.clamp(0.01, std::f32::consts::PI - 0.01);
-
-        self.last_x = x;
-        self.last_y = y;
-    }
-
-}
-
-fn load_shader(path: &str, shader_type: u32) -> Result<u32, String> {
-    let source = std::fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read shader file {}: {}", path, e))?;
-    
-    let c_source = CString::new(source.as_bytes())
-        .map_err(|e| format!("CString conversion failed: {}", e))?;
-    
-    unsafe {
-        let shader = CreateShader(shader_type);
-        ShaderSource(shader, 1, &c_source.as_ptr(), ptr::null());
-        CompileShader(shader);
-        
-        let mut success = 0;
-        GetShaderiv(shader, COMPILE_STATUS, &mut success);
-        
-        if success == 0 {
-            let mut len = 0;
-            GetShaderiv(shader, INFO_LOG_LENGTH, &mut len);
-            let mut buffer = vec![0u8; len as usize];
-            GetShaderInfoLog(shader, len, ptr::null_mut(), buffer.as_mut_ptr() as *mut i8);
-            let error = String::from_utf8_lossy(&buffer);
-            return Err(format!("Shader compilation failed for {}: {}", path, error));
-        }
-        
-        Ok(shader)
-    }
-}
-
-fn create_shader_program(vert_path: &str, frag_path: &str) -> Result<u32, String> {
-    let vert_shader = load_shader(vert_path, VERTEX_SHADER)?;
-    let frag_shader = load_shader(frag_path, FRAGMENT_SHADER)?;
-    
-    unsafe {
-        let program = CreateProgram();
-        AttachShader(program, vert_shader);
-        AttachShader(program, frag_shader);
-        LinkProgram(program);
-        
-        let mut success = 0;
-        GetProgramiv(program, LINK_STATUS, &mut success);
-        
-        if success == 0 {
-            let mut len = 0;
-            GetProgramiv(program, INFO_LOG_LENGTH, &mut len);
-            let mut buffer = vec![0u8; len as usize];
-            GetProgramInfoLog(program, len, ptr::null_mut(), buffer.as_mut_ptr() as *mut i8);
-            let error = String::from_utf8_lossy(&buffer);
-            return Err(format!("Program linking failed: {}", error));
-        }
-        
-        DeleteShader(vert_shader);
-        DeleteShader(frag_shader);
-        
-        Ok(program)
-    }
-}
+mod camera;
+mod shader;
+use shader::{create_shader_program};
+use camera::{Camera, CameraMode};
 
 fn create_fullscreen_quad() -> u32 {
     let vertices: [f32; 18] = [
@@ -466,8 +254,7 @@ fn main() {
                     camera.adjust_roll(0.1);
                 }
                 glfw::WindowEvent::Key(Key::R, _, Action::Press, _) => {
-                    camera.roll = 0.0;
-                    println!("Camera roll reset");
+                    camera.reset_roll();
                 }
                 glfw::WindowEvent::MouseButton(glfw::MouseButton::Button1, Action::Press, _) => {
                     camera.dragging = true;
