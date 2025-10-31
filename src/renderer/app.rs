@@ -14,7 +14,8 @@ pub struct App {
 	pub gravitational_lensing: bool,
 	pub fov: f32,
 	pub passive_tracking: bool,
-	pub shader: u32
+	pub shader: u32,
+	pub fps_counter: FpsCounter,
 }
 
 impl App {
@@ -38,7 +39,8 @@ impl App {
 			gravitational_lensing: true,
 			fov: 60.0,
 			passive_tracking: false,
-			shader: create_shader_program("shaders/blackhole.vert", "shaders/blackhole.frag").unwrap()
+			shader: create_shader_program("shaders/blackhole.vert", "shaders/blackhole.frag").unwrap(),
+			fps_counter: FpsCounter::new(),
 		}
 	}
 
@@ -107,6 +109,7 @@ impl App {
 			}
 
 			self.window_ctx.window.swap_buffers();
+			self.fps_counter.update();
 		}
 
 		unsafe {

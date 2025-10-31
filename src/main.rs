@@ -2,6 +2,7 @@ mod gl_bindings;
 
 mod camera;
 mod shader;
+mod fps;
 mod renderer;
 
 use renderer::app::App;
