@@ -11,9 +11,8 @@ const TITLE: &str = "Black Hole Renderer";
 mod camera;
 mod shader;
 mod renderer;
-use shader::{create_shader_program};
 use camera::{Camera, CameraMode};
-use renderer::{window::WindowContext, mesh::create_fullscreen_quad};
+use renderer::{window::WindowContext, mesh::create_fullscreen_quad, shader_manager::ShaderManager};
 
 fn main() {
     
@@ -30,82 +29,10 @@ fn main() {
         println!("OpenGL version: {}", version.to_str().unwrap());
     }
 
-    let shader_program_simple = match create_shader_program(
-        "shaders/blackhole.vert",
-        "shaders/blackhole_simple.frag"
-    ) {
-        Ok(prog) => {
-            println!("Simple shader compiled");
-            prog
-        },
-        Err(e) => {
-            eprintln!("Simple shader error: {}", e);
-            return;
-        }
-    };
-    
-    let shader_program_full = match create_shader_program(
-        "shaders/blackhole.vert",
-        "shaders/blackhole.frag"
-    ) {
-        Ok(prog) => {
-            println!("Full shader compiled");
-            prog
-        },
-        Err(e) => {
-            eprintln!("Full shader error: {}", e);
-            return;
-        }
-    };
-    
-    let shader_program_debug = match create_shader_program(
-        "shaders/blackhole.vert",
-        "shaders/debug.frag"
-    ) {
-        Ok(prog) => {
-            println!("Debug shader compiled");
-            prog
-        },
-        Err(e) => {
-            eprintln!("Debug shader error: {}", e);
-            return;
-        }
-    };
-    
-    let mut current_shader = 0; // 0=simple, 1=full, 2=debug
-    let mut shader_program = shader_program_simple;
+    let mut shaders = ShaderManager::new();
 
     let quad_vao = create_fullscreen_quad();
     println!("Fullscreen quad created");
-
-    let u_resolution = unsafe {
-        let name = CString::new("u_resolution").unwrap();
-        GetUniformLocation(shader_program, name.as_ptr())
-    };
-    let u_time = unsafe {
-        let name = CString::new("u_time").unwrap();
-        GetUniformLocation(shader_program, name.as_ptr())
-    };
-    let u_camera_pos = unsafe {
-        let name = CString::new("u_camera_pos").unwrap();
-        GetUniformLocation(shader_program, name.as_ptr())
-    };
-    let u_view_matrix = unsafe {
-        let name = CString::new("u_view_matrix").unwrap();
-        GetUniformLocation(shader_program, name.as_ptr())
-    };
-    let u_fov = unsafe {
-        let name = CString::new("u_fov").unwrap();
-        GetUniformLocation(shader_program, name.as_ptr())
-    };
-    let u_render_disk = unsafe {
-        let name = CString::new("u_render_disk").unwrap();
-        GetUniformLocation(shader_program, name.as_ptr())
-    };
-    let u_gravitational_lensing = unsafe {
-        let name = CString::new("u_gravitational_lensing").unwrap();
-        GetUniformLocation(shader_program, name.as_ptr())
-    };
 
     let mut camera = Camera::new();
     let mut passive_tracking = false;
@@ -175,21 +102,7 @@ fn main() {
                     println!("Gravitational lensing: {}", if gravitational_lensing { "ON" } else { "OFF" });
                 }
                 glfw::WindowEvent::Key(Key::S, _, Action::Press, _) => {
-                    current_shader = (current_shader + 1) % 3;
-                    shader_program = match current_shader {
-                        0 => {
-                            println!("Switched to: SIMPLE shader (normalized units, fast)");
-                            shader_program_simple
-                        },
-                        1 => {
-                            println!("Switched to: FULL shader (physical units, detailed)");
-                            shader_program_full
-                        },
-                        _ => {
-                            println!("Switched to: DEBUG shader (testing)");
-                            shader_program_debug
-                        },
-                    };
+                    shaders.switch();
                 }
                 glfw::WindowEvent::Key(Key::Num1, _, Action::Press, _) => {
                     camera.set_mode(CameraMode::FreeOrbit);
@@ -246,9 +159,7 @@ fn main() {
             Clear(COLOR_BUFFER_BIT | DEPTH_BUFFER_BIT);
         }
 
-        unsafe {
-            UseProgram(shader_program);
-        }
+        shaders.use_current();
 
         let (fb_width, fb_height) = window_ctx.window.get_framebuffer_size();
         let elapsed = start_time.elapsed().as_secs_f32();
@@ -256,18 +167,18 @@ fn main() {
         let view_mat = camera.get_view_matrix();
 
         unsafe {
-            Uniform2f(u_resolution, fb_width as f32, fb_height as f32);
-            Uniform1f(u_time, elapsed);
-            Uniform3f(u_camera_pos, cam_pos.x, cam_pos.y, cam_pos.z);
+            Uniform2f(shaders.get_uniform("u_resolution"), fb_width as f32, fb_height as f32);
+            Uniform1f(shaders.get_uniform("u_time"), elapsed);
+            Uniform3f(shaders.get_uniform("u_camera_pos"), cam_pos.x, cam_pos.y, cam_pos.z);
             let mat_data = [
                 view_mat.m11, view_mat.m12, view_mat.m13,
                 view_mat.m21, view_mat.m22, view_mat.m23,
                 view_mat.m31, view_mat.m32, view_mat.m33,
             ];
-            UniformMatrix3fv(u_view_matrix, 1, FALSE, mat_data.as_ptr());
-            Uniform1f(u_fov, fov);
-            Uniform1i(u_render_disk, if render_disk { 1 } else { 0 });
-            Uniform1i(u_gravitational_lensing, if gravitational_lensing { 1 } else { 0 });
+            UniformMatrix3fv(shaders.get_uniform("u_view_matrix"), 1, FALSE, mat_data.as_ptr());
+            Uniform1f(shaders.get_uniform("u_fov"), fov);
+            Uniform1i(shaders.get_uniform("u_render_disk"), if render_disk { 1 } else { 0 });
+            Uniform1i(shaders.get_uniform("u_gravitational_lensing"), if gravitational_lensing { 1 } else { 0 });
         }
 
         unsafe {
@@ -280,9 +191,9 @@ fn main() {
     }
 
     unsafe {
-        DeleteProgram(shader_program_simple);
-        DeleteProgram(shader_program_full);
-        DeleteProgram(shader_program_debug);
+        DeleteProgram(shaders.simple);
+        DeleteProgram(shaders.full);
+        DeleteProgram(shaders.debug);
         DeleteVertexArrays(1, &quad_vao);
     }
 
