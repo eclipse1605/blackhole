@@ -37,9 +37,9 @@ impl Camera {
             radius: 6.0e10,
             target_radius: 6.0e10,
             min_radius: 2.0e10,
-            max_radius: 2.0e11,
+            max_radius: 5.0e11,
             orbit_speed: 0.003,
-            zoom_speed: 5.0e9,
+            zoom_speed: 2.0e10,
             auto_orbit_speed: 0.05,
             lerp_factor: 0.1,
             dragging: false,
@@ -150,7 +150,7 @@ impl Camera {
         println!("Camera roll reset");
     }
 
-    pub fn passive_mouse_move(&mut self, x: f64, y: f64, width: f64, height: f64) {
+    pub fn passive_mouse_move(&mut self, x: f64, y: f64) {
         let dx = (x - self.last_x) as f32;
         let dy = (y - self.last_y) as f32;
 

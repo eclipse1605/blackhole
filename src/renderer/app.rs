@@ -173,7 +173,7 @@ impl App {
 			}
 			glfw::WindowEvent::CursorPos(x, y) => {
 				if self.passive_tracking {
-					self.camera.passive_mouse_move(x, y, self.window_width() as f64, self.window_height() as f64);
+					self.camera.passive_mouse_move(x, y);
 				} else {
 					self.camera.process_mouse_move(x, y);
 				}
@@ -183,14 +183,6 @@ impl App {
 			}
 			_ => {}
 		}
-	}
-
-	fn window_width(&self) -> u32 {
-		self.window_ctx.window.get_framebuffer_size().0 as u32
-	}
-
-	fn window_height(&self) -> u32 {
-		self.window_ctx.window.get_framebuffer_size().1 as u32
 	}
 
 	fn manual(&self) {
