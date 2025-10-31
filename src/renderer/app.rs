@@ -1,4 +1,4 @@
-use crate::{camera::{Camera, CameraMode}, renderer::{window::WindowContext, mesh::create_fullscreen_quad, shader_manager::ShaderManager}};
+use crate::{camera::{Camera, CameraMode}, renderer::{window::WindowContext, mesh::create_fullscreen_quad, utils::get_uniform}, shader::create_shader_program};
 use crate::gl_bindings::*;
 use glfw::{self,Context, Action, Key};
 
@@ -8,13 +8,13 @@ const TITLE: &str = "Black Hole Renderer";
 
 pub struct App {
 	pub window_ctx: WindowContext,
-	pub shaders: ShaderManager,
 	pub camera: Camera,
 	pub vao: u32,
 	pub render_disk: bool,
 	pub gravitational_lensing: bool,
 	pub fov: f32,
 	pub passive_tracking: bool,
+	pub shader: u32
 }
 
 impl App {
@@ -27,19 +27,18 @@ impl App {
 		window_ctx.window.set_scroll_polling(true);
 		window_ctx.window.set_framebuffer_size_polling(true);
 
-		let shaders = ShaderManager::new();
 		let camera = Camera::new();
 		let vao = create_fullscreen_quad();
 
 		Self {
 			window_ctx,
-			shaders,
 			camera,
 			vao,
 			render_disk: true,
 			gravitational_lensing: true,
 			fov: 60.0,
 			passive_tracking: false,
+			shader: create_shader_program("shaders/blackhole.vert", "shaders/blackhole.frag").unwrap()
 		}
 	}
 
@@ -77,7 +76,9 @@ impl App {
 				Clear(COLOR_BUFFER_BIT | DEPTH_BUFFER_BIT);
 			}
 
-			self.shaders.use_current();
+			unsafe {
+            	UseProgram(self.shader);
+        	}
 
 			let (fb_width, fb_height) = self.window_ctx.window.get_framebuffer_size();
 			let elapsed = start_time.elapsed().as_secs_f32();
@@ -85,18 +86,18 @@ impl App {
 			let view_mat = self.camera.get_view_matrix();
 
 			unsafe {
-				Uniform2f(self.shaders.get_uniform("u_resolution"), fb_width as f32, fb_height as f32);
-				Uniform1f(self.shaders.get_uniform("u_time"), elapsed);
-				Uniform3f(self.shaders.get_uniform("u_camera_pos"), cam_pos.x, cam_pos.y, cam_pos.z);
+				Uniform2f(get_uniform(self.shader, "u_resolution"), fb_width as f32, fb_height as f32);
+				Uniform1f(get_uniform(self.shader, "u_time"), elapsed);
+				Uniform3f(get_uniform(self.shader, "u_camera_pos"), cam_pos.x, cam_pos.y, cam_pos.z);
 				let mat_data = [
 					view_mat.m11, view_mat.m12, view_mat.m13,
 					view_mat.m21, view_mat.m22, view_mat.m23,
 					view_mat.m31, view_mat.m32, view_mat.m33,
 				];
-				UniformMatrix3fv(self.shaders.get_uniform("u_view_matrix"), 1, FALSE, mat_data.as_ptr());
-				Uniform1f(self.shaders.get_uniform("u_fov"), self.fov);
-				Uniform1i(self.shaders.get_uniform("u_render_disk"), if self.render_disk { 1 } else { 0 });
-				Uniform1i(self.shaders.get_uniform("u_gravitational_lensing"), if self.gravitational_lensing { 1 } else { 0 });
+				UniformMatrix3fv(get_uniform(self.shader, "u_view_matrix"), 1, FALSE, mat_data.as_ptr());
+				Uniform1f(get_uniform(self.shader, "u_fov"), self.fov);
+				Uniform1i(get_uniform(self.shader, "u_render_disk"), if self.render_disk { 1 } else { 0 });
+				Uniform1i(get_uniform(self.shader, "u_gravitational_lensing"), if self.gravitational_lensing { 1 } else { 0 });
 			}
 
 			unsafe {
@@ -109,9 +110,6 @@ impl App {
 		}
 
 		unsafe {
-			DeleteProgram(self.shaders.simple);
-			DeleteProgram(self.shaders.full);
-			DeleteProgram(self.shaders.debug);
 			DeleteVertexArrays(1, &self.vao);
 		}
 	}
@@ -137,9 +135,6 @@ impl App {
 			glfw::WindowEvent::Key(Key::G, _, Action::Press, _) => {
 				self.gravitational_lensing = !self.gravitational_lensing;
 				println!("Gravitational lensing: {}", if self.gravitational_lensing { "ON" } else { "OFF" });
-			}
-			glfw::WindowEvent::Key(Key::S, _, Action::Press, _) => {
-				self.shaders.switch();
 			}
 			glfw::WindowEvent::Key(Key::Num1, _, Action::Press, _) => {
 				self.camera.set_mode(CameraMode::FreeOrbit);
@@ -187,7 +182,7 @@ impl App {
 
 	fn manual(&self) {
 		println!("\n╔════════════════════════════════════════════════════╗");
-		println!("║     Black Hole 3D Renderer - Controls             ║");
+		println!("║     Black Hole 3D Renderer - Controls              ║");
 		println!("╠════════════════════════════════════════════════════╣");
 		println!("║ CAMERA                                             ║");
 		println!("║   Left Mouse + Drag : Orbit camera                 ║");
@@ -203,7 +198,6 @@ impl App {
 		println!("║ RENDERING                                          ║");
 		println!("║   D Key             : Toggle accretion disk        ║");
 		println!("║   G Key             : Toggle gravitational lensing ║");
-		println!("║   S Key             : Switch shader mode           ║");
 		println!("╠════════════════════════════════════════════════════╣");
 		println!("║ ESC                 : Exit                         ║");
 		println!("╚════════════════════════════════════════════════════╝\n");
