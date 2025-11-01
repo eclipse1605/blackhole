@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 glfw = "0.56.0"
 gl = "0.14.0"
+image = "0.25" 
 nalgebra-glm = "0.18.0"
 
 [build-dependencies]

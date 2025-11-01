@@ -1,5 +1,7 @@
 use crate::{camera::{Camera, CameraMode, FreeCamDirection}, renderer::{window::WindowContext, mesh::create_fullscreen_quad, utils::get_uniform}, shader::create_shader_program};
 use crate::gl_bindings::*;
+use crate::renderer::skybox::Skybox;
+use crate::renderer::utils::load_texture;
 use glfw::{self,Context, Action, Key};
 
 const WIDTH: u32 = 1920;
@@ -16,6 +18,8 @@ pub struct App {
 	pub passive_tracking: bool,
 	pub shader: u32,
 	pub fps_counter: FpsCounter,
+	pub skybox: Skybox,
+    pub color_map: u32,
 }
 
 impl App {
@@ -31,6 +35,12 @@ impl App {
 		let camera = Camera::new();
 		let vao = create_fullscreen_quad();
 
+		let skybox = Skybox::load_from_folder("assets/skybox_nebula_dark")
+			.expect("Failed to load skybox");
+
+		let color_map = load_texture("assets/color_map.png")
+			.expect("Failed to load color map texture");
+
 		Self {
 			window_ctx,
 			camera,
@@ -41,6 +51,8 @@ impl App {
 			passive_tracking: false,
 			shader: create_shader_program("shaders/blackhole.vert", "shaders/blackhole.frag").unwrap(),
 			fps_counter: FpsCounter::new(),
+			color_map,
+    		skybox,
 		}
 	}
 
@@ -100,6 +112,15 @@ impl App {
 				Uniform1f(get_uniform(self.shader, "u_fov"), self.fov);
 				Uniform1i(get_uniform(self.shader, "u_render_disk"), if self.render_disk { 1 } else { 0 });
 				Uniform1i(get_uniform(self.shader, "u_gravitational_lensing"), if self.gravitational_lensing { 1 } else { 0 });
+			}
+
+			unsafe {
+				ActiveTexture(TEXTURE0);
+				BindTexture(TEXTURE_2D, self.color_map);
+				Uniform1i(get_uniform(self.shader, "colorMap"), 0);
+
+				self.skybox.bind(1);
+				Uniform1i(get_uniform(self.shader, "skybox"), 1);
 			}
 
 			unsafe {
