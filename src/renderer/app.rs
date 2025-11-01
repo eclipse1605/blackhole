@@ -1,4 +1,4 @@
-use crate::{camera::{Camera, CameraMode, FreeCamDirection}, renderer::{window::WindowContext, mesh::create_fullscreen_quad, utils::get_uniform}, shader::create_shader_program};
+use crate::{camera::{Camera, CameraMode, FreeCamDirection}, fps::FpsCounter, renderer::{window::WindowContext, mesh::create_fullscreen_quad, utils::get_uniform}, shader::create_shader_program};
 use crate::gl_bindings::*;
 use crate::renderer::skybox::Skybox;
 use crate::renderer::utils::load_texture;
