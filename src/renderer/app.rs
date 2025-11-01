@@ -3,6 +3,10 @@ use crate::gl_bindings::*;
 use crate::renderer::skybox::Skybox;
 use crate::renderer::utils::load_texture;
 use glfw::{self,Context, Action, Key};
+use std::fs;
+use std::path::Path;
+use chrono::Local;
+use image::{ImageBuffer, Rgba};
 
 const WIDTH: u32 = 1920;
 const HEIGHT: u32 = 1080;
@@ -20,6 +24,8 @@ pub struct App {
 	pub fps_counter: FpsCounter,
 	pub skybox: Skybox,
     pub color_map: u32,
+	pub screenshot_icon: u32,   
+    pub icon_size: f32,
 }
 
 impl App {
@@ -41,6 +47,9 @@ impl App {
 		let color_map = load_texture("assets/color_map.png")
 			.expect("Failed to load color map texture");
 
+		let screenshot_icon = load_texture("assets/ss.png")
+    		.expect("Failed to load screenshot icon");
+
 		Self {
 			window_ctx,
 			camera,
@@ -53,6 +62,8 @@ impl App {
 			fps_counter: FpsCounter::new(),
 			color_map,
     		skybox,
+			screenshot_icon,
+			icon_size: 64.0,
 		}
 	}
 
@@ -127,6 +138,42 @@ impl App {
 				BindVertexArray(self.vao);
 				DrawArrays(TRIANGLES, 0, 6);
 				BindVertexArray(0);
+			}
+
+			unsafe {
+				Disable(DEPTH_TEST);
+				Enable(BLEND);
+				BlendFunc(SRC_ALPHA, ONE_MINUS_SRC_ALPHA);
+
+				MatrixMode(PROJECTION);
+				PushMatrix();
+				LoadIdentity();
+				Ortho(0.0, fb_width as f64, 0.0, fb_height as f64, -1.0, 1.0);
+
+				MatrixMode(MODELVIEW);
+				PushMatrix();
+				LoadIdentity();
+
+				BindTexture(TEXTURE_2D, self.screenshot_icon);
+
+				let size = self.icon_size;
+				let x = 20.0;
+				let y = 20.0;
+
+				Begin(QUADS);
+				TexCoord2f(0.0, 0.0); Vertex2f(x, y);
+				TexCoord2f(1.0, 0.0); Vertex2f(x + size, y);
+				TexCoord2f(1.0, 1.0); Vertex2f(x + size, y + size);
+				TexCoord2f(0.0, 1.0); Vertex2f(x, y + size);
+				End();
+
+				PopMatrix();
+				MatrixMode(PROJECTION);
+				PopMatrix();
+				MatrixMode(MODELVIEW);
+
+				Enable(DEPTH_TEST);
+				Disable(BLEND);
 			}
 
 			self.window_ctx.window.swap_buffers();
@@ -204,11 +251,28 @@ impl App {
 					self.camera.move_freecam(FreeCamDirection::Right);
 				}
 			}
+			glfw::WindowEvent::Key(Key::P, _, Action::Press, _) => {
+				self.take_screenshot();
+			}
 			glfw::WindowEvent::MouseButton(glfw::MouseButton::Button1, Action::Press, _) => {
-				self.camera.dragging = true;
 				let (x, y) = self.window_ctx.window.get_cursor_pos();
-				self.camera.last_x = x;
-				self.camera.last_y = y;
+				let (width, height) = self.window_ctx.window.get_framebuffer_size();
+
+				let y = height as f64 - y;
+
+				let icon_x = 20.0;
+				let icon_y = 20.0;
+				let icon_size = self.icon_size as f64;
+
+				if x >= icon_x && x <= icon_x + icon_size && y >= icon_y && y <= icon_y + icon_size {
+					println!("Screenshot button clicked!");
+					self.take_screenshot();
+				} else {
+					self.camera.dragging = true;
+					let (x, y) = self.window_ctx.window.get_cursor_pos();
+					self.camera.last_x = x;
+					self.camera.last_y = y;
+				}
 			}
 			glfw::WindowEvent::MouseButton(glfw::MouseButton::Button1, Action::Release, _) => {
 				self.camera.dragging = false;
@@ -227,6 +291,44 @@ impl App {
 		}
 	}
 
+	fn take_screenshot(&self) {
+		unsafe {
+			let (width, height) = self.window_ctx.window.get_framebuffer_size();
+			let mut pixels = vec![0u8; (width * height * 4) as usize];
+			ReadPixels(
+				0,
+				0,
+				width,
+				height,
+				RGBA,
+				UNSIGNED_BYTE,
+				pixels.as_mut_ptr() as *mut std::ffi::c_void,
+			);
+
+			let mut flipped = vec![0u8; pixels.len()];
+			for y in 0..height {
+				let src = (y * width * 4) as usize;
+				let dst = ((height - 1 - y) * width * 4) as usize;
+				flipped[dst..dst + (width * 4) as usize]
+					.copy_from_slice(&pixels[src..src + (width * 4) as usize]);
+			}
+
+			let dir = Path::new("screenshots");
+			if !dir.exists() {
+				fs::create_dir_all(dir).expect("Failed to create screenshots directory");
+			}
+
+			let timestamp = Local::now().format("%Y-%m-%d_%H-%M-%S");
+			let filename = format!("screenshots/screenshot_{}.png", timestamp);
+
+			let img = ImageBuffer::<Rgba<u8>, _>::from_raw(width as u32, height as u32, flipped)
+				.expect("Failed to create ImageBuffer");
+			img.save(&filename).expect("Failed to save screenshot");
+
+			println!("Screenshot saved to {}", filename);
+		}
+	}
+
 	fn manual(&self) {
 		println!("\n╔════════════════════════════════════════════════════╗");
 		println!("║     Black Hole 3D Renderer - Controls              ║");
@@ -240,6 +342,7 @@ impl App {
 		println!("║   4 Key             : Top view                     ║");
 		println!("║   Q/E Keys          : Roll camera left/right       ║");
 		println!("║   R Key             : Reset camera roll            ║");
+		println!("║   P Key             : Take screenshot              ║");
 		println!("║   T Key             : Active/passive mouse tracking║");
 		println!("║   C Key             : Toggle FreeCam/LockedCam     ║");
 		println!("║   Arrow Keys        : Move camera (FreeCam only)   ║");
