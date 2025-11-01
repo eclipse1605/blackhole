@@ -1,4 +1,4 @@
-use crate::{camera::{Camera, CameraMode}, renderer::{window::WindowContext, mesh::create_fullscreen_quad, utils::get_uniform}, shader::create_shader_program};
+use crate::{camera::{Camera, CameraMode, FreeCamDirection}, renderer::{window::WindowContext, mesh::create_fullscreen_quad, utils::get_uniform}, shader::create_shader_program};
 use crate::gl_bindings::*;
 use glfw::{self,Context, Action, Key};
 
@@ -157,6 +157,29 @@ impl App {
 			glfw::WindowEvent::Key(Key::R, _, Action::Press, _) => {
 				self.camera.reset_roll();
 			}
+			glfw::WindowEvent::Key(Key::C, _, Action::Press, _) => {
+				self.camera.toggle_camera_type();
+			}
+			glfw::WindowEvent::Key(Key::Up, _, action, _) => {
+				if action == Action::Press || action == Action::Repeat {
+					self.camera.move_freecam(FreeCamDirection::Up);
+				}
+			}
+			glfw::WindowEvent::Key(Key::Down, _, action, _) => {
+				if action == Action::Press || action == Action::Repeat {
+					self.camera.move_freecam(FreeCamDirection::Down);
+				}
+			}
+			glfw::WindowEvent::Key(Key::Left, _, action, _) => {
+				if action == Action::Press || action == Action::Repeat {
+					self.camera.move_freecam(FreeCamDirection::Left);
+				}
+			}
+			glfw::WindowEvent::Key(Key::Right, _, action, _) => {
+				if action == Action::Press || action == Action::Repeat {
+					self.camera.move_freecam(FreeCamDirection::Right);
+				}
+			}
 			glfw::WindowEvent::MouseButton(glfw::MouseButton::Button1, Action::Press, _) => {
 				self.camera.dragging = true;
 				let (x, y) = self.window_ctx.window.get_cursor_pos();
@@ -194,6 +217,8 @@ impl App {
 		println!("║   Q/E Keys          : Roll camera left/right       ║");
 		println!("║   R Key             : Reset camera roll            ║");
 		println!("║   T Key             : Active/passive mouse tracking║");
+		println!("║   C Key             : Toggle FreeCam/LockedCam     ║");
+		println!("║   Arrow Keys        : Move camera (FreeCam only)   ║");
 		println!("╠════════════════════════════════════════════════════╣");
 		println!("║ RENDERING                                          ║");
 		println!("║   D Key             : Toggle accretion disk        ║");
