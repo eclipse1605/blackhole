@@ -26,6 +26,9 @@ pub struct App {
     pub color_map: u32,
 	pub screenshot_icon: u32,   
     pub icon_size: f32,
+	pub is_fullscreen: bool,
+    pub windowed_pos: (i32, i32),
+    pub windowed_size: (i32, i32),
 }
 
 impl App {
@@ -64,6 +67,9 @@ impl App {
     		skybox,
 			screenshot_icon,
 			icon_size: 64.0,
+			is_fullscreen: false,
+			windowed_pos: (100, 100),
+			windowed_size: (WIDTH as i32, HEIGHT as i32),
 		}
 	}
 
@@ -185,6 +191,44 @@ impl App {
 		}
 	}
 
+	fn toggle_fullscreen(&mut self) {
+		if self.is_fullscreen {
+			self.window_ctx.window.set_monitor(
+				glfw::WindowMode::Windowed,
+				self.windowed_pos.0,
+				self.windowed_pos.1,
+				self.windowed_size.0 as u32,
+				self.windowed_size.1 as u32,
+				None,
+			);
+			self.is_fullscreen = false;
+			println!("Switched to windowed mode");
+		} else {
+			self.windowed_pos = self.window_ctx.window.get_pos();
+			let (w, h) = self.window_ctx.window.get_size();
+			self.windowed_size = (w, h);
+
+			self.window_ctx.glfw.with_primary_monitor(|_, monitor_opt| {
+				if let Some(monitor) = monitor_opt {
+					if let Some(mode) = monitor.get_video_mode() {
+						self.window_ctx.window.set_monitor(
+							glfw::WindowMode::FullScreen(monitor),
+							0,
+							0,
+							mode.width,
+							mode.height,
+							Some(mode.refresh_rate),
+						);
+						self.is_fullscreen = true;
+						println!("Switched to fullscreen mode");
+					}
+				} else {
+					println!("No primary monitor found!");
+				}
+			});
+		}
+	}
+
 	fn process_input(&mut self, event: glfw::WindowEvent) {
 		match event {
 			glfw::WindowEvent::Key(Key::T, _, Action::Press, _) => {
@@ -195,6 +239,10 @@ impl App {
 				unsafe {
 					Viewport(0, 0, width, height);
 				}
+			}
+			glfw::WindowEvent::Key(Key::F, _, Action::Press, _) 
+			| glfw::WindowEvent::Key(Key::F12, _, Action::Press, _) => {
+				self.toggle_fullscreen();
 			}
 			glfw::WindowEvent::Key(Key::Escape, _, Action::Press, _) => {
 				self.window_ctx.window.set_should_close(true);
@@ -346,6 +394,7 @@ impl App {
 		println!("║   T Key             : Active/passive mouse tracking║");
 		println!("║   C Key             : Toggle FreeCam/LockedCam     ║");
 		println!("║   Arrow Keys        : Move camera (FreeCam only)   ║");
+		println!("║   F / F12 Keys       : Toggle fullscreen mode      ║");
 		println!("╠════════════════════════════════════════════════════╣");
 		println!("║ RENDERING                                          ║");
 		println!("║   D Key             : Toggle accretion disk        ║");

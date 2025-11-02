@@ -370,8 +370,8 @@ impl Camera {
         let up = glm::cross(&right, &forward);
 
         let movement = match direction {
-            FreeCamDirection::Up => up * self.move_speed,
-            FreeCamDirection::Down => -up * self.move_speed,
+            FreeCamDirection::Up => -up * self.move_speed,
+            FreeCamDirection::Down => up * self.move_speed,
             FreeCamDirection::Left => -right * self.move_speed,
             FreeCamDirection::Right => right * self.move_speed,
         };
