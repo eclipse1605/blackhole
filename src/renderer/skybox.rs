@@ -66,6 +66,9 @@ impl Skybox {
                 TEXTURE_WRAP_R,
                 CLAMP_TO_EDGE as i32,
             );
+                // Generate mipmaps for better sampling performance and enable trilinear filtering.
+                GenerateMipmap(TEXTURE_CUBE_MAP);
+                TexParameteri(TEXTURE_CUBE_MAP, TEXTURE_MIN_FILTER, LINEAR_MIPMAP_LINEAR as i32);
         }
 
         Ok(Skybox { id: texture_id })

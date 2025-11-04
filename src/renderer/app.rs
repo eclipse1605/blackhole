@@ -61,7 +61,32 @@ impl App {
 			gravitational_lensing: true,
 			fov: 60.0,
 			passive_tracking: false,
-			shader: create_shader_program("shaders/blackhole.vert", "shaders/blackhole.frag").unwrap(),
+			// Create shader program but handle compile/link failures gracefully.
+			shader: {
+				use std::time::Instant;
+				let start = Instant::now();
+				match create_shader_program("shaders/blackhole.vert", "shaders/blackhole.frag") {
+					Ok(p) => {
+						let dur = start.elapsed();
+						println!("Loaded main shader in {:.2?}", dur);
+						p
+					}
+					Err(e) => {
+						println!("ERROR: Failed to compile/link main shader: {}", e);
+						println!("Attempting to load fallback shader to avoid crash...");
+						match create_shader_program("shaders/fallback.vert", "shaders/fallback.frag") {
+							Ok(f) => {
+								let dur = start.elapsed();
+								println!("Loaded fallback shader in {:.2?}", dur);
+								f
+							}
+							Err(e2) => {
+								panic!("Failed to compile both main and fallback shaders. main: {}\nfallback: {}", e, e2);
+							}
+						}
+					}
+				}
+			},
 			fps_counter: FpsCounter::new(),
 			color_map,
     		skybox,
@@ -129,6 +154,10 @@ impl App {
 				Uniform1f(get_uniform(self.shader, "u_fov"), self.fov);
 				Uniform1i(get_uniform(self.shader, "u_render_disk"), if self.render_disk { 1 } else { 0 });
 				Uniform1i(get_uniform(self.shader, "u_gravitational_lensing"), if self.gravitational_lensing { 1 } else { 0 });
+						// Dynamic quality uniforms (defaults -> medium)
+						Uniform1i(get_uniform(self.shader, "u_max_iter"), 600);
+						Uniform1f(get_uniform(self.shader, "u_step_scale"), 1.0);
+						Uniform1i(get_uniform(self.shader, "u_noise_lod"), 2);
 			}
 
 			unsafe {
@@ -278,6 +307,10 @@ impl App {
 			}
 			glfw::WindowEvent::Key(Key::C, _, Action::Press, _) => {
 				self.camera.toggle_camera_type();
+				// Reset mouse deltas to avoid a large jump when switching camera types.
+				let (x, y) = self.window_ctx.window.get_cursor_pos();
+				self.camera.last_x = x;
+				self.camera.last_y = y;
 			}
 			glfw::WindowEvent::Key(Key::Up, _, action, _) => {
 				if action == Action::Press || action == Action::Repeat {

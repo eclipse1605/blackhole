@@ -23,6 +23,14 @@ impl WindowContext {
 
 		load_with(|symbol| window.get_proc_address(symbol) as *const _);
 
+		// Print GL vendor/renderer/version so the user can verify which GPU is being used.
+		unsafe {
+			let vendor = std::ffi::CStr::from_ptr(GetString(VENDOR) as *const i8).to_string_lossy();
+			let renderer = std::ffi::CStr::from_ptr(GetString(RENDERER) as *const i8).to_string_lossy();
+			let version = std::ffi::CStr::from_ptr(GetString(VERSION) as *const i8).to_string_lossy();
+			eprintln!("OpenGL vendor: {} | renderer: {} | version: {}", vendor, renderer, version);
+		}
+
 		Self { glfw, window, events }
 	}
 

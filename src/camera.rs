@@ -48,7 +48,9 @@ pub struct Camera {
 
 impl Camera {
     pub fn new() -> Self {
-        let initial_radius = 6.0e10;
+    // Use shader-friendly units (schwarzschild units). Keep camera distances small
+    // so zooming/fov behave sensibly inside the shader.
+    let initial_radius = 15.0;
         let initial_azimuth = PI * 0.25;
         let initial_elevation = PI * 0.45;
         let elev_clamped = initial_elevation.clamp(0.01, PI - 0.01);
@@ -64,10 +66,10 @@ impl Camera {
             elevation: initial_elevation,
             radius: initial_radius,
             target_radius: initial_radius,
-            min_radius: 2.0e10,
-            max_radius: 5.0e11,
+            min_radius: 2.0,
+            max_radius: 500.0,
             orbit_speed: 0.003,
-            zoom_speed: 2.0e10,
+            zoom_speed: 2.0,
             auto_orbit_speed: 0.05,
             lerp_factor: 0.1,
             dragging: false,
@@ -76,7 +78,7 @@ impl Camera {
             roll: 0.0,
             camera_type: CameraType::LockedCam,
             free_position: initial_pos,
-            move_speed: 1.0e10,
+            move_speed: 1.0,
             target_distance: initial_radius,
         }
     }
@@ -121,10 +123,10 @@ impl Camera {
             CameraType::FreeCam => {
                 match self.mode {
                     CameraMode::FrontView => {
-                        glm::vec3(10.0e10, 1.0e10, 10.0e10)
+                        glm::vec3(10.0, 1.0, 10.0)
                     }
                     CameraMode::TopView => {
-                        glm::vec3(0.0, 15.0e10, 0.1e10)
+                        glm::vec3(0.0, 15.0, 0.1)
                     }
                     _ => {
                         self.free_position
@@ -134,10 +136,10 @@ impl Camera {
             CameraType::LockedCam => {
                 match self.mode {
                     CameraMode::FrontView => {
-                        glm::vec3(10.0e10, 1.0e10, 10.0e10)
+                        glm::vec3(10.0, 1.0, 10.0)
                     }
                     CameraMode::TopView => {
-                        glm::vec3(0.0, 15.0e10, 0.1e10)
+                        glm::vec3(0.0, 15.0, 0.1)
                     }
                     _ => {
                         let elev_clamped = self.elevation.clamp(0.01, PI - 0.01);
@@ -265,7 +267,7 @@ impl Camera {
         if self.camera_type == CameraType::FreeCam {
             match mode {
                 CameraMode::FrontView => {
-                    self.free_position = glm::vec3(10.0e10, 1.0e10, 10.0e10);
+                    self.free_position = glm::vec3(10.0, 1.0, 10.0);
                     let target = glm::vec3(0.0, 0.0, 0.0);
                     let direction = glm::normalize(&(target - self.free_position));
                     self.elevation = direction.y.acos();
@@ -273,7 +275,7 @@ impl Camera {
                     self.elevation = self.elevation.clamp(0.01, PI - 0.01);
                 }
                 CameraMode::TopView => {
-                    self.free_position = glm::vec3(0.0, 15.0e10, 0.1e10);
+                    self.free_position = glm::vec3(0.0, 15.0, 0.1);
                     let target = glm::vec3(0.0, 0.0, 0.0);
                     let direction = glm::normalize(&(target - self.free_position));
                     self.elevation = direction.y.acos();
