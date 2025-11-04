@@ -25,10 +25,15 @@ impl Skybox {
 
         for (i, face) in faces.iter().enumerate() {
             let path = folder.as_ref().join(face);
-            let img = image::open(&path)
+            let mut dyn_img = image::open(&path)
                 .map_err(|_| format!("Failed to load cubemap face {:?}", path))?
-                .flipv()
-                .to_rgb8();
+                .flipv();
+
+                if *face == "top.png" || *face == "bottom.png" {
+                dyn_img = dyn_img.rotate180();
+            }
+
+            let img = dyn_img.to_rgb8();
 
             let (width, height) = img.dimensions();
             let data = img.into_raw();
