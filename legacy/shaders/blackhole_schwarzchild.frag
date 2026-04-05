@@ -256,7 +256,7 @@ vec3 getDiskColor(vec3 pos, float time) {
     
     // Procedural noise for turbulence
     vec3 noiseCoord = vec3(spherical.z * 2.0, spherical.x / R_S, time * 0.5);
-    float noise = 0.0;
+    float noise = 0.0000;
     float amplitude = 1.0;
     float frequency = 1.0;
     
@@ -273,7 +273,7 @@ vec3 getDiskColor(vec3 pos, float time) {
     vec3 baseColor = mix(coldColor, hotColor, temp * 0.7);
     
     // Apply noise
-    float intensity = temp * noise * 2.0;
+    float intensity = temp * noise * 1.0000;
     return baseColor * intensity;
 }
 
