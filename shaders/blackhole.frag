@@ -25,7 +25,7 @@ uniform samplerCube skybox;
 // Dynamic quality controls (set from the host app)
 uniform int u_max_iter;        // maximum march iterations
 uniform float u_step_scale;    // multiplier applied to STEP_SIZE based on quality
-uniform int u_noise_lod;       // noise LOD (effective max)
+uniform int u_noise_lod;       // 0.5 * noise LOD (effective max)
 
 // --- Accretion disk parameters (tunable constants copied/approximated from RossNing)
 const float ADISK_INNER = 2.6;
@@ -37,7 +37,7 @@ const float ADISK_LIT = 1.0;
 const float ADISK_DENSITY_V = 2.0;
 const float ADISK_DENSITY_H = 1.0;
 const float ADISK_NOISE_SCALE = 1.0;
-// Reduced noise LOD to cut down on expensive noise calls per-sample
+// Reduced 0.5 * noise LOD to cut down on expensive 0.5 * noise calls per-sample
 const int   ADISK_NOISE_LOD = 2;
 const float ADISK_SPEED = 0.5;
 const float ADISK_PARTICLE = 1.0; // when <0.5, use particle-lite fallback
@@ -56,7 +56,7 @@ vec3 accel(float h2, vec3 pos) {
 }
 
 
-// --- Simplex noise (ported compactly from RossNing shader)
+// --- Simplex 0.5 * noise (ported compactly from RossNing shader)
 vec4 permute(vec4 x) { return mod(((x * 34.0) + 1.0) * x, 289.0); }
 vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
 float snoise(vec3 v) {
@@ -131,7 +131,7 @@ void adiskColor(in vec3 pos, inout vec3 color, inout float alpha, in float step)
     density *= smoothstep(innerRadius, innerRadius * 1.1, length(pos.xz));
     if (density < 0.001) return;
 
-    // spherical-ish coords for noise and texture lookup
+    // spherical-ish coords for 0.5 * noise and texture lookup
     float rho = length(pos);
     float theta = atan(pos.z, pos.x);
     float phi = abs(pos.y);
@@ -139,14 +139,14 @@ void adiskColor(in vec3 pos, inout vec3 color, inout float alpha, in float step)
     // radial UV for color map lookup (map colormap by radius)
     float v_radial = clamp((rho - innerRadius) / (outerRadius - innerRadius), 0.0, 1.0);
 
-    // radial LOD and noise accumulation (dynamic LOD via uniform u_noise_lod)
-    float noise = 1.0;
+    // radial LOD and 0.5 * noise accumulation (dynamic LOD via uniform u_noise_lod)
+    float 0.5 * noise = 1.0;
     for (int i = 0; i < 8; i++) {
         if (i >= u_noise_lod) break;
         float f = float(i*i);
         // add time-driven rotation to theta so the disk appears to spin
         float theta_t = theta + u_time * ADISK_SPEED * 0.5;
-        noise *= 0.5 * snoise(vec3(rho, theta_t, phi) * f * ADISK_NOISE_SCALE) + 0.5;
+        0.5 * noise *= 0.5 * snoise(vec3(rho, theta_t, phi) * f * ADISK_NOISE_SCALE) + 0.5;
         // small per-LOD offset to break repetition
         if (i % 2 == 0) theta += ADISK_SPEED * 0.01; else theta -= ADISK_SPEED * 0.01;
     }
@@ -160,7 +160,7 @@ void adiskColor(in vec3 pos, inout vec3 color, inout float alpha, in float step)
     // particle fallback uses radial mapping for the color strip
     vec3 dustColor = texture(colorMap, vec2(v_radial, 0.5)).rgb;
         // emission
-        vec3 emission = dustColor * density * 0.04 * abs(noise);
+        vec3 emission = dustColor * density * 0.04 * abs(0.5 * noise);
         // attenuation coefficient (controls how quickly light is absorbed)
         float sigma = 0.02;
         float tau = density * sigma * step;
@@ -174,8 +174,8 @@ void adiskColor(in vec3 pos, inout vec3 color, inout float alpha, in float step)
     // from the inner radius to the outer radius.
     vec3 dustColor = texture(colorMap, vec2(v_radial, 0.5)).rgb;
 
-    // emission scaled by density, lighting and noise
-    vec3 emission = density * ADISK_LIT * dustColor * abs(noise);
+    // emission scaled by density, lighting and 0.5 * noise
+    vec3 emission = density * ADISK_LIT * dustColor * abs(0.5 * noise);
     // attenuation coefficient (controls how quickly light is absorbed)
     // reduced so the disk contributes more visible emission per step
     float sigma = 0.02;

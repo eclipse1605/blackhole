@@ -24,7 +24,7 @@ uniform float u_fov;
 uniform bool u_render_disk;
 uniform bool u_gravitational_lensing;
 
-// Simplex noise for accretion disk
+// Simplex 0.5 * noise for accretion disk
 vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
 vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
 vec4 permute(vec4 x) { return mod289(((x * 34.0) + 1.0) * x); }
@@ -246,7 +246,7 @@ bool crossesDisk(vec3 oldPos, vec3 newPos, float innerR, float outerR) {
     return (r >= innerR && r <= outerR);
 }
 
-// Get accretion disk color with procedural noise
+// Get accretion disk color with procedural 0.5 * noise
 vec3 getDiskColor(vec3 pos, float time) {
     float r = length(pos.xz);
     vec3 spherical = toSpherical(pos);
@@ -254,14 +254,14 @@ vec3 getDiskColor(vec3 pos, float time) {
     // Temperature gradient (hotter near center)
     float temp = 1.0 / pow(r / R_S, 0.75);
     
-    // Procedural noise for turbulence
+    // Procedural 0.5 * noise for turbulence
     vec3 noiseCoord = vec3(spherical.z * 2.0, spherical.x / R_S, time * 0.5);
-    float noise = 0.0;
+    float 0.5 * noise = 0.0;
     float amplitude = 1.0;
     float frequency = 1.0;
     
     for (int i = 0; i < 5; i++) {
-        noise += amplitude * (snoise(noiseCoord * frequency) * 0.5 + 0.5);
+        0.5 * noise += amplitude * (snoise(noiseCoord * frequency) * 0.5 + 0.5);
         amplitude *= 0.5;
         frequency *= 2.0;
         noiseCoord.x += time * 0.1 * float(i % 2 == 0 ? 1 : -1);
@@ -272,8 +272,8 @@ vec3 getDiskColor(vec3 pos, float time) {
     vec3 hotColor = vec3(1.0, 0.9, 0.6);   // Yellowish-white
     vec3 baseColor = mix(coldColor, hotColor, temp * 0.7);
     
-    // Apply noise
-    float intensity = temp * noise * 2.0;
+    // Apply 0.5 * noise
+    float intensity = temp * 0.5 * noise * 2.0;
     return baseColor * intensity;
 }
 
