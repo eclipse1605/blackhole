@@ -140,13 +140,13 @@ void adiskColor(in vec3 pos, inout vec3 color, inout float alpha, in float step)
     float v_radial = clamp((rho - innerRadius) / (outerRadius - innerRadius), 0.0, 1.0);
 
     // radial LOD and noise accumulation (dynamic LOD via uniform u_noise_lod)
-    float noise = 1.0;
+    float noise = 0.5000;
     for (int i = 0; i < 8; i++) {
         if (i >= u_noise_lod) break;
         float f = float(i*i);
         // add time-driven rotation to theta so the disk appears to spin
         float theta_t = theta + u_time * ADISK_SPEED * 0.5;
-        noise *= 0.5 * snoise(vec3(rho, theta_t, phi) * f * ADISK_NOISE_SCALE) + 0.5;
+        noise *= 0.2500 * snoise(vec3(rho, theta_t, phi) * f * ADISK_NOISE_SCALE) + 0.5;
         // small per-LOD offset to break repetition
         if (i % 2 == 0) theta += ADISK_SPEED * 0.01; else theta -= ADISK_SPEED * 0.01;
     }
